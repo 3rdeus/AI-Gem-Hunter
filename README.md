@@ -280,3 +280,13 @@ Checks the health of the API and its dependencies.
 - [Anthropic API](https://docs.anthropic.com/)
 - [Birdeye API](https://docs.birdeye.so/)
 - [Solscan API](https://docs.solscan.io/)
+
+
+## Birdeye Integration
+
+- **WebSocket**: Real-time data streaming
+- **Wallet Tracking**: Monitor wallet performance
+- **Liquidity Monitoring**: Track pool liquidity changes
+- **Historical Data**: Analyze price patterns
+
+Test endpoint: `/api/birdeye-test`
