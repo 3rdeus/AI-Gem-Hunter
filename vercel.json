@@ -1,0 +1,30 @@
+{
+  "version": 2,
+  "builds": [
+    {
+      "src": "api/check-token.js",
+      "use": "@vercel/node"
+    },
+    {
+      "src": "api/health.js",
+      "use": "@vercel/node"
+    }
+  ],
+  "routes": [
+    {
+      "src": "/api/check-token",
+      "dest": "/api/check-token.js"
+    },
+    {
+      "src": "/api/health",
+      "dest": "/api/health.js"
+    },
+    {
+      "src": "/webhook/token-check",
+      "dest": "/api/check-token.js"
+    }
+  ],
+  "env": {
+    "NODE_ENV": "production"
+  }
+}
