@@ -107,3 +107,33 @@ CREATE POLICY "Allow authenticated users to submit reports"
 CREATE POLICY "Allow service role access to logs"
   ON api_logs FOR ALL
   USING (auth.role() = 'service_role');
+
+-- Table: trading_positions
+-- Track open and closed trading positions for the bot
+CREATE TABLE IF NOT EXISTS trading_positions (
+  id BIGSERIAL PRIMARY KEY,
+  token_address TEXT NOT NULL,
+  entry_price DECIMAL NOT NULL,
+  exit_price DECIMAL,
+  amount_sol DECIMAL NOT NULL,
+  status TEXT NOT NULL DEFAULT 'open', -- 'open', 'closed'
+  profit_loss DECIMAL,
+  entry_time TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  exit_time TIMESTAMP WITH TIME ZONE,
+  stop_loss DECIMAL,
+  take_profit DECIMAL,
+  notes TEXT
+);
+
+-- Index for fast lookups of open positions
+CREATE INDEX IF NOT EXISTS idx_trading_positions_status ON trading_positions(status);
+CREATE INDEX IF NOT EXISTS idx_trading_positions_token ON trading_positions(token_address);
+CREATE INDEX IF NOT EXISTS idx_trading_positions_entry_time ON trading_positions(entry_time DESC);
+
+-- Enable Row Level Security
+ALTER TABLE trading_positions ENABLE ROW LEVEL SECURITY;
+
+-- Policy: Allow service role full access to positions
+CREATE POLICY "Allow service role access to positions"
+  ON trading_positions FOR ALL
+  USING (auth.role() = 'service_role');
