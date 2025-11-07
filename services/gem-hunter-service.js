@@ -118,7 +118,8 @@ async function handleGemDiscovered(gemData) {
     stats.topGems = stats.topGems.slice(0, 10);
 
     // Determine if we should send alert based on gem score
-    if (gemData.gemScore >= 60) {
+    // Only send alerts for high-quality gems (score >= 80)
+    if (gemData.gemScore >= 80) {
       // High-quality gem - send alert
       const alertResult = await sendGemAlert(gemData);
       
@@ -129,7 +130,7 @@ async function handleGemDiscovered(gemData) {
         console.error(`❌ Failed to send gem alert: ${alertResult.error}`);
       }
     } else {
-      console.log(`📊 Gem score too low (${gemData.gemScore}/100) - no alert sent`);
+      console.log(`📊 Gem score below threshold (${gemData.gemScore}/100 < 80) - no alert sent`);
     }
 
     // Check for critical warnings (bundled launch, deployer funding, etc.)
