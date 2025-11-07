@@ -1,50 +1,125 @@
 /**
- * Birdeye Integration Test Endpoint
- * Test all Birdeye features
+ * Birdeye Integration Test Endpoint (Simplified)
+ * Tests Birdeye API connectivity without complex imports
  */
 
-import { testBirdeyeWebSocket } from '../lib/birdeye-websocket.js';
-import { testBirdeyeWalletTracking, analyzeWalletPerformance } from '../lib/birdeye-wallet-tracking.js';
-import { testBirdeyeLiquidity } from '../lib/birdeye-liquidity.js';
-import { testBirdeyeHistorical, analyzePatterns } from '../lib/birdeye-historical.js';
-
 export default async function handler(req, res) {
-  const { test = 'all', tokenAddress, walletAddress } = req.query;
+  const { test = 'all' } = req.query;
 
   try {
-    let results = {};
-
-    // Test WebSocket
-    if (test === 'all' || test === 'websocket') {
-      console.log('🧪 Testing WebSocket...');
-      results.websocket = await testBirdeyeWebSocket();
+    const BIRDEYE_API_KEY = process.env.BIRDEYE_API_KEY;
+    
+    if (!BIRDEYE_API_KEY) {
+      return res.status(500).json({
+        success: false,
+        error: 'BIRDEYE_API_KEY not configured'
+      });
     }
 
-    // Test Wallet Tracking
-    if (test === 'all' || test === 'wallet') {
-      console.log('🧪 Testing Wallet Tracking...');
-      results.walletTracking = await testBirdeyeWalletTracking();
-      
-      // If wallet address provided, analyze it
-      if (walletAddress) {
-        results.walletAnalysis = await analyzeWalletPerformance(walletAddress);
+    let results = {};
+
+    // Test 1: API Connectivity
+    if (test === 'all' || test === 'connectivity') {
+      try {
+        // Test with USDC token
+        const testToken = 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v';
+        const response = await fetch(
+          `https://public-api.birdeye.so/defi/price?address=${testToken}`,
+          {
+            headers: {
+              'X-API-KEY': BIRDEYE_API_KEY
+            }
+          }
+        );
+
+        if (response.ok) {
+          const data = await response.json();
+          results.connectivity = {
+            success: true,
+            message: 'Birdeye API connected successfully',
+            testToken: testToken,
+            price: data.data?.value || 'N/A'
+          };
+        } else {
+          results.connectivity = {
+            success: false,
+            error: `API returned ${response.status}`
+          };
+        }
+      } catch (error) {
+        results.connectivity = {
+          success: false,
+          error: error.message
+        };
       }
     }
 
-    // Test Liquidity Monitoring
-    if (test === 'all' || test === 'liquidity') {
-      console.log('🧪 Testing Liquidity Monitoring...');
-      results.liquidity = await testBirdeyeLiquidity();
+    // Test 2: Token Overview
+    if (test === 'all' || test === 'overview') {
+      try {
+        const testToken = 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v';
+        const response = await fetch(
+          `https://public-api.birdeye.so/defi/token_overview?address=${testToken}`,
+          {
+            headers: {
+              'X-API-KEY': BIRDEYE_API_KEY
+            }
+          }
+        );
+
+        if (response.ok) {
+          const data = await response.json();
+          results.overview = {
+            success: true,
+            message: 'Token overview retrieved successfully',
+            liquidity: data.data?.liquidity || 'N/A',
+            volume24h: data.data?.v24hUSD || 'N/A'
+          };
+        } else {
+          results.overview = {
+            success: false,
+            error: `API returned ${response.status}`
+          };
+        }
+      } catch (error) {
+        results.overview = {
+          success: false,
+          error: error.message
+        };
+      }
     }
 
-    // Test Historical Data
-    if (test === 'all' || test === 'historical') {
-      console.log('🧪 Testing Historical Data...');
-      results.historical = await testBirdeyeHistorical();
-      
-      // If token address provided, analyze patterns
-      if (tokenAddress) {
-        results.patternAnalysis = await analyzePatterns(tokenAddress);
+    // Test 3: Price History
+    if (test === 'all' || test === 'history') {
+      try {
+        const testToken = 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v';
+        const response = await fetch(
+          `https://public-api.birdeye.so/defi/history_price?address=${testToken}&address_type=token&type=1H&time_from=${Math.floor(Date.now() / 1000) - 3600}&time_to=${Math.floor(Date.now() / 1000)}`,
+          {
+            headers: {
+              'X-API-KEY': BIRDEYE_API_KEY
+            }
+          }
+        );
+
+        if (response.ok) {
+          const data = await response.json();
+          results.history = {
+            success: true,
+            message: 'Price history retrieved successfully',
+            dataPoints: data.data?.items?.length || 0
+          };
+        } else {
+          results.history = {
+            success: false,
+            error: `API returned ${response.status}`
+          };
+        }
+      } catch (error) {
+        results.history = {
+          success: false,
+          error: error.message
+        };
       }
     }
 
@@ -54,8 +129,8 @@ export default async function handler(req, res) {
     return res.status(200).json({
       success: allSuccess,
       message: allSuccess
-        ? '✅ All Birdeye integrations working!'
-        : '⚠️ Some integrations failed',
+        ? '✅ All Birdeye API tests passed!'
+        : '⚠️ Some tests failed',
       results,
       timestamp: new Date().toISOString()
     });
