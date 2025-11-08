@@ -10,7 +10,7 @@ import {
   sendSmartMoneyAlert,
   sendDailySummary,
   sendTestMessage
-} from '../lib/telegram-bot.js';
+} from '../lib/telegram-bot.mjs';
 
 /**
  * Service state
