@@ -1,99 +1,144 @@
 /**
- * Service Wrapper with Health Check Server
- * Starts the gem hunter service and provides HTTP endpoint for DigitalOcean
+ * Birdeye Integration Test Endpoint (Simplified)
+ * Tests Birdeye API connectivity without complex imports
  */
 
-import { startGemHunter, stopGemHunter, getServiceStats } from './gem-hunter-service.js';
-import http from 'http';
+export default async function handler(req, res) {
+  const { test = 'all' } = req.query;
 
-const PORT = process.env.PORT || 8080;
-let healthServer = null;
-
-/**
- * Create HTTP server for health checks
- */
-function createHealthServer( ) {
-  const server = http.createServer((req, res ) => {
-    // Health check endpoint
-    if (req.url === '/health' || req.url === '/') {
-      const stats = getServiceStats();
-      res.writeHead(200, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({
-        status: 'healthy',
-        service: 'AI Gem Hunter',
-        ...stats,
-        timestamp: new Date().toISOString()
-      }));
-    }
-    // Stats endpoint
-    else if (req.url === '/stats') {
-      res.writeHead(200, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify(getServiceStats()));
-    }
-    // 404 for other routes
-    else {
-      res.writeHead(404, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({ error: 'Not found' }));
-    }
-  });
-
-  server.listen(PORT, '0.0.0.0', () => {
-    console.log(`🏥 Health check server listening on port ${PORT}`);
-  });
-
-  return server;
-}
-
-/**
- * Main entry point
- */
-async function main() {
-  console.log('🎯 Initializing AI Gem Hunter Service...');
-  
   try {
-    // Start health check server first
-    healthServer = createHealthServer();
-    console.log('✅ Health check server started');
-
-    // Start gem hunter service
-    const result = await startGemHunter();
+    const BIRDEYE_API_KEY = process.env.BIRDEYE_API_KEY;
     
-    if (result.success) {
-      console.log('✅ AI Gem Hunter Service fully initialized');
-      console.log('💎 Ready to discover gems!');
-    } else {
-      console.error('❌ Failed to start Gem Hunter:', result.message);
-      process.exit(1);
+    if (!BIRDEYE_API_KEY) {
+      return res.status(500).json({
+        success: false,
+        error: 'BIRDEYE_API_KEY not configured'
+      });
     }
 
-    // Handle graceful shutdown
-    process.on('SIGTERM', () => {
-      console.log('📴 Received SIGTERM, shutting down gracefully...');
-      stopGemHunter();
-      if (healthServer) {
-        healthServer.close(() => {
-          console.log('👋 Service stopped');
-          process.exit(0);
-        });
-      }
-    });
+    let results = {};
 
-    process.on('SIGINT', () => {
-      console.log('📴 Received SIGINT, shutting down gracefully...');
-      stopGemHunter();
-      if (healthServer) {
-        healthServer.close(() => {
-          console.log('👋 Service stopped');
-          process.exit(0);
-        });
-      }
-    });
+    // Test 1: API Connectivity
+    if (test === 'all' || test === 'connectivity') {
+      try {
+        // Test with USDC token
+        const testToken = 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v';
+        const response = await fetch(
+          `https://public-api.birdeye.so/defi/price?address=${testToken}`,
+          {
+            headers: {
+              'X-API-KEY': BIRDEYE_API_KEY
+            }
+          }
+        );
 
+        if (response.ok) {
+          const data = await response.json();
+          results.connectivity = {
+            success: true,
+            message: 'Birdeye API connected successfully',
+            testToken: testToken,
+            price: data.data?.value || 'N/A'
+          };
+        } else {
+          results.connectivity = {
+            success: false,
+            error: `API returned ${response.status}`
+          };
+        }
+      } catch (error) {
+        results.connectivity = {
+          success: false,
+          error: error.message
+        };
+      }
+    }
+
+    // Test 2: Token Overview
+    if (test === 'all' || test === 'overview') {
+      try {
+        const testToken = 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v';
+        const response = await fetch(
+          `https://public-api.birdeye.so/defi/token_overview?address=${testToken}`,
+          {
+            headers: {
+              'X-API-KEY': BIRDEYE_API_KEY
+            }
+          }
+        );
+
+        if (response.ok) {
+          const data = await response.json();
+          results.overview = {
+            success: true,
+            message: 'Token overview retrieved successfully',
+            liquidity: data.data?.liquidity || 'N/A',
+            volume24h: data.data?.v24hUSD || 'N/A'
+          };
+        } else {
+          results.overview = {
+            success: false,
+            error: `API returned ${response.status}`
+          };
+        }
+      } catch (error) {
+        results.overview = {
+          success: false,
+          error: error.message
+        };
+      }
+    }
+
+    // Test 3: Price History
+    if (test === 'all' || test === 'history') {
+      try {
+        const testToken = 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v';
+        const response = await fetch(
+          `https://public-api.birdeye.so/defi/history_price?address=${testToken}&address_type=token&type=1H&time_from=${Math.floor(Date.now() / 1000) - 3600}&time_to=${Math.floor(Date.now() / 1000)}`,
+          {
+            headers: {
+              'X-API-KEY': BIRDEYE_API_KEY
+            }
+          }
+        );
+
+        if (response.ok) {
+          const data = await response.json();
+          results.history = {
+            success: true,
+            message: 'Price history retrieved successfully',
+            dataPoints: data.data?.items?.length || 0
+          };
+        } else {
+          results.history = {
+            success: false,
+            error: `API returned ${response.status}`
+          };
+        }
+      } catch (error) {
+        results.history = {
+          success: false,
+          error: error.message
+        };
+      }
+    }
+
+    // Summary
+    const allSuccess = Object.values(results).every(r => r.success);
+
+    return res.status(200).json({
+      success: allSuccess,
+      message: allSuccess
+        ? '✅ All Birdeye API tests passed!'
+        : '⚠️ Some tests failed',
+      results,
+      timestamp: new Date().toISOString()
+    });
   } catch (error) {
-    console.error('❌ Fatal error starting service:', error);
-    process.exit(1);
+    console.error('Birdeye test error:', error.message);
+    return res.status(500).json({
+      success: false,
+      error: error.message
+    });
   }
 }
-
-// Start the service
-main();
