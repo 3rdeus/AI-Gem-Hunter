@@ -3,7 +3,7 @@
  * Integrates real-time discovery with Telegram notifications
  */
 
-import { startTokenDiscovery, getDiscoveryStats } from '../lib/real-time-discovery.js';
+import { startTokenDiscovery, getDiscoveryStats } from '../lib/real-time-discovery.mjs';
 import {
   sendGemAlert,
   sendCriticalWarning,
