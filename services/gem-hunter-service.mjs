@@ -241,7 +241,6 @@ export function getServiceStatus() {
     startTime: stats.startTime,
     stats: getServiceStats()
   };
-}
-startGemHunter();
+} startGemHunter();
 process.stdin.resume();
 
