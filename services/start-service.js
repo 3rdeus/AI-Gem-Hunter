@@ -48,7 +48,7 @@ function startGemHunterService() {
   console.log('🎯 Starting AI Gem Hunter Service...');
   
   // Start the service in the background
-  serviceProcess = exec('node services/gem-hunter-service.js', (error, stdout, stderr) => {
+  serviceProcess = exec('node --experimental-modules services/gem-hunter-service.js', (error, stdout, stderr) => {
     if (error) {
       console.error(`❌ Service error: ${error.message}`);
       return;
