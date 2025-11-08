@@ -6,8 +6,7 @@
   "type": "module",
   "scripts": {
     "dev": "node --watch api/check-token.js",
-    "start": "node api/check-token.js",
-    "test": "node test/test-api.js"
+    "start": "node services/gem-hunter-service.js",    "test": "node test/test-api.js"
   },
   "keywords": [
     "solana",
