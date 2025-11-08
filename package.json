@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "description": "Fast, lightweight API server for Solana token safety checks with AI analysis",
   "main": "api/check-token.js",
-  "type": "module",
+
   "scripts": {
     "dev": "node --watch api/check-token.js",
     "start": "node services/start-service.js",    "test": "node test/test-api.js"
