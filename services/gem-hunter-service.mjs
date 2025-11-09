@@ -366,3 +366,15 @@ export function stopGemHunterService() {
   isRunning = false;
   console.log('[GEM-HUNTER] ✅ Service stopped');
 }
+
+/**
+ * Auto-start when run directly
+ * This allows the service to be executed as a standalone script
+ */
+if (import.meta.url === `file://${process.argv[1]}`) {
+  console.log('[GEM-HUNTER] 🚀 Starting service from direct execution...');
+  startGemHunterService().catch((error) => {
+    console.error('[GEM-HUNTER] ❌ Fatal error:', error);
+    process.exit(1);
+  });
+}
