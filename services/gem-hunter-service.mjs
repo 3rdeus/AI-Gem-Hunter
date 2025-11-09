@@ -68,10 +68,16 @@ export async function startGemHunterService() {
   isRunning = true;
   
   // Start token discovery with scoring
-  await startTokenDiscovery(handleGemDiscovered);
+  startTokenDiscovery(handleGemDiscovered);
   
   // Schedule daily summary
   scheduleDailySummary();
+  
+  // Keep the process alive
+  setInterval(() => {
+    // This interval keeps the Node.js event loop active
+    // The WebSocket connections will handle the actual work
+  }, 60000); // Check every minute
   
   console.log('[GEM-HUNTER] ✅ Gem Hunter service started');
   
