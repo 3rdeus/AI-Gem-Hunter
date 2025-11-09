@@ -67,20 +67,18 @@ export async function startGemHunterService() {
   serviceStats.startTime = new Date();
   isRunning = true;
   
-  // Start token discovery with scoring
-  console.log('[GEM-HUNTER] 🔍 About to call startTokenDiscovery...');
-  console.log('[GEM-HUNTER] startTokenDiscovery type:', typeof startTokenDiscovery);
-  await startTokenDiscovery(handleGemDiscovered);
-  console.log('[GEM-HUNTER] ✅ startTokenDiscovery completed');
-  
   // Schedule daily summary
   scheduleDailySummary();
   
   console.log('[GEM-HUNTER] ✅ Gem Hunter service started');
-  console.log('[GEM-HUNTER] 🔍 WebSocket connections will keep the process alive');
+  console.log('[GEM-HUNTER] 🔍 Starting token discovery with WebSocket connections...');
   
-  // Return success immediately - the WebSocket connections will keep the event loop active
-  return { success: true, message: 'AI Gem Hunter Service started successfully' };
+  // Start token discovery - this will never return (contains never-resolving Promise)
+  // The WebSocket connections will keep the process alive indefinitely
+  await startTokenDiscovery(handleGemDiscovered);
+  
+  // This line will never be reached
+  console.log('[GEM-HUNTER] ⚠️ startTokenDiscovery unexpectedly completed');
 }
 
 /**
