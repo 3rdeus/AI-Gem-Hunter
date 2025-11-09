@@ -3,7 +3,7 @@
  * Starts the gem hunter service and provides HTTP endpoint for DigitalOcean
  */
 
-import { startGemHunter, stopGemHunter, getServiceStats } from './gem-hunter-service.js';
+import { startGemHunter, getServiceStats, stopGemHunterService } from './services/gem-hunter-service.mjs';
 import http from 'http';
 
 const PORT = process.env.PORT || 8080;
@@ -55,21 +55,17 @@ async function main() {
     healthServer = createHealthServer();
     console.log('✅ Health check server started');
 
-    // Start gem hunter service
-    const result = await startGemHunter();
+    // Start gem hunter service (this will never return - it runs indefinitely)
+    console.log('🚀 Starting Gem Hunter service...');
+    await startGemHunter();
     
-    if (result.success) {
-      console.log('✅ AI Gem Hunter Service fully initialized');
-      console.log('💎 Ready to discover gems!');
-    } else {
-      console.error('❌ Failed to start Gem Hunter:', result.message);
-      process.exit(1);
-    }
+    // This line will never be reached - the service runs forever
+    console.log('⚠️ Gem Hunter service unexpectedly stopped');
 
     // Handle graceful shutdown
     process.on('SIGTERM', () => {
       console.log('📴 Received SIGTERM, shutting down gracefully...');
-      stopGemHunter();
+      stopGemHunterService();
       if (healthServer) {
         healthServer.close(() => {
           console.log('👋 Service stopped');
@@ -80,7 +76,7 @@ async function main() {
 
     process.on('SIGINT', () => {
       console.log('📴 Received SIGINT, shutting down gracefully...');
-      stopGemHunter();
+      stopGemHunterService();
       if (healthServer) {
         healthServer.close(() => {
           console.log('👋 Service stopped');
