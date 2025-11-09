@@ -1,6 +1,7 @@
 /**
  * AI Gem Hunter Service
  * Integrates real-time discovery with Telegram notifications
+ * NOW WITH LIQUIDITY FILTERING
  */
 
 import { startTokenDiscovery, getDiscoveryStats } from '../lib/real-time-discovery.mjs';
@@ -11,6 +12,7 @@ import {
   sendDailySummary,
   sendTestMessage
 } from '../lib/telegram-bot.mjs';
+import { checkLiquidity } from '../lib/liquidity-checker.js';
 
 /**
  * Service state
@@ -22,7 +24,9 @@ let stats = {
   alertsSent: 0,
   criticalWarnings: 0,
   startTime: null,
-  topGems: []
+  topGems: [],
+  tokensFiltered: 0,  // NEW: Track filtered tokens
+  liquidityCheckErrors: 0  // NEW: Track API errors
 };
 
 /**
@@ -30,22 +34,20 @@ let stats = {
  */
 export async function startGemHunter() {
   if (isRunning) {
-    console.log('Gem Hunter is already running');
+    console.log('⚠️ Gem Hunter is already running');
     return { success: false, message: 'Already running' };
   }
 
   console.log('🚀 Starting AI Gem Hunter Service...');
-  
-
 
   // Start token discovery with callback
   discoveryWebSocket = startTokenDiscovery(handleGemDiscovered);
-  
+
   isRunning = true;
   stats.startTime = new Date();
 
   console.log('✅ AI Gem Hunter Service started');
-  console.log('📡 Monitoring Raydium, Orca, and pump.fun for new launches...');
+  console.log('👀 Monitoring Raydium, Orca, and pump.fun for new launches...');
 
   // Schedule daily summary (every 24 hours)
   setInterval(sendDailySummaryReport, 24 * 60 * 60 * 1000);
@@ -65,14 +67,14 @@ export function stopGemHunter() {
     return { success: false, message: 'Service not running' };
   }
 
-  console.log('⏸️ Stopping AI Gem Hunter Service...');
+  isRunning = false;
+
+  console.log('🛑 Stopping AI Gem Hunter Service...');
 
   if (discoveryWebSocket) {
     discoveryWebSocket.close();
     discoveryWebSocket = null;
   }
-
-  isRunning = false;
 
   console.log('✅ AI Gem Hunter Service stopped');
 
@@ -85,20 +87,43 @@ export function stopGemHunter() {
 
 /**
  * Handle gem discovered callback
+ * NOW WITH LIQUIDITY FILTERING
  * @param {Object} gemData - Discovered gem data
  */
 async function handleGemDiscovered(gemData) {
   try {
     console.log(`💎 Gem discovered: ${gemData.tokenAddress}`);
 
+    // ============================================
+    // NEW: LIQUIDITY FILTER
+    // ============================================
+    const liquidityCheck = await checkLiquidity(gemData.tokenAddress);
+    
+    if (liquidityCheck.error) {
+      // Track API errors but don't block the token
+      stats.liquidityCheckErrors++;
+      console.log(`⚠️ Liquidity check error for ${gemData.tokenAddress}: ${liquidityCheck.error}`);
+    }
+    
+    if (!liquidityCheck.passed) {
+      // Token failed liquidity check - filter it out
+      stats.tokensFiltered++;
+      console.log(`🚫 Token ${gemData.tokenAddress} filtered: liquidity too low ($${liquidityCheck.liquidity.toFixed(2)} < $150)`);
+      return; // Skip this token
+    }
+    
+    console.log(`✅ Token ${gemData.tokenAddress} passed liquidity filter: $${liquidityCheck.liquidity.toFixed(2)}`);
+    // ============================================
+
     stats.gemsDiscovered++;
 
     // Add to top gems list
     stats.topGems.push({
       address: gemData.tokenAddress,
-      name: gemData.basicData.name,
-      symbol: gemData.basicData.symbol,
+      name: gemData.basicData?.name,
+      symbol: gemData.basicData?.symbol,
       score: gemData.gemScore,
+      liquidity: liquidityCheck.liquidity,  // NEW: Include liquidity in gem data
       discoveredAt: new Date()
     });
 
@@ -111,68 +136,19 @@ async function handleGemDiscovered(gemData) {
     if (gemData.gemScore >= 80) {
       // High-quality gem - send alert
       const alertResult = await sendGemAlert(gemData);
-      
+
       if (alertResult.success) {
         stats.alertsSent++;
-        console.log(`✅ Gem alert sent: ${gemData.basicData.name}`);
+        console.log(`✅ Alert sent for gem: ${gemData.tokenAddress}`);
       } else {
-        console.error(`❌ Failed to send gem alert: ${alertResult.error}`);
+        console.error(`❌ Failed to send alert: ${alertResult.error}`);
       }
     } else {
-      console.log(`📊 Gem score below threshold (${gemData.gemScore}/100 < 80) - no alert sent`);
+      console.log(`ℹ️ Gem score (${gemData.gemScore}) below alert threshold (80) - skipping alert`);
     }
-
-    // Check for critical warnings (bundled launch, deployer funding, etc.)
-    await checkForCriticalWarnings(gemData);
 
   } catch (error) {
-    console.error('Error handling gem discovery:', error.message);
-  }
-}
-
-/**
- * Check for critical warnings and send alerts
- * @param {Object} gemData - Gem data
- */
-async function checkForCriticalWarnings(gemData) {
-  const warnings = [];
-
-  // Check volume authenticity
-  if (gemData.filters.volumeAuthenticity && !gemData.filters.volumeAuthenticity.isAuthentic) {
-    warnings.push(`Wash trading detected: ${gemData.filters.volumeAuthenticity.reason}`);
-  }
-
-  // Check wallet clustering
-  if (gemData.filters.walletClustering && gemData.filters.walletClustering.isSuspicious) {
-    warnings.push(`Suspicious wallet clustering: ${(gemData.filters.walletClustering.clusteringScore * 100).toFixed(1)}%`);
-  }
-
-  // Check top holder concentration
-  if (gemData.basicData.top_holder_percent > 40) {
-    warnings.push(`High holder concentration: Top holder owns ${gemData.basicData.top_holder_percent.toFixed(1)}%`);
-  }
-
-  // Check liquidity
-  if (gemData.basicData.liquidity_usd < 20000) {
-    warnings.push(`Low liquidity: Only $${gemData.basicData.liquidity_usd.toFixed(0)}`);
-  }
-
-  // If we have critical warnings, send alert
-  if (warnings.length >= 2) {
-    const warningData = {
-      tokenAddress: gemData.tokenAddress,
-      tokenName: gemData.basicData.name,
-      tokenSymbol: gemData.basicData.symbol,
-      warningType: 'Multiple Risk Factors Detected',
-      details: warnings
-    };
-
-    const result = await sendCriticalWarning(warningData);
-    
-    if (result.success) {
-      stats.criticalWarnings++;
-      console.log(`🚨 Critical warning sent: ${gemData.basicData.name}`);
-    }
+    console.error('❌ Error handling gem discovery:', error);
   }
 }
 
@@ -181,28 +157,20 @@ async function checkForCriticalWarnings(gemData) {
  */
 async function sendDailySummaryReport() {
   try {
-    const summaryData = {
+    const summary = {
       gemsDiscovered: stats.gemsDiscovered,
       alertsSent: stats.alertsSent,
-      topGems: stats.topGems.slice(0, 5),
-      performance: {
-        avgScore: stats.topGems.length > 0
-          ? stats.topGems.reduce((sum, gem) => sum + gem.score, 0) / stats.topGems.length
-          : 0,
-        accuracy: 0, // Would calculate from historical data
-        bestPerformer: stats.topGems[0]?.name || 'N/A'
-      }
+      tokensFiltered: stats.tokensFiltered,  // NEW: Include in summary
+      liquidityCheckErrors: stats.liquidityCheckErrors,  // NEW: Include in summary
+      topGems: stats.topGems.slice(0, 5), // Top 5 gems
+      uptime: Date.now() - stats.startTime.getTime()
     };
 
-    await sendDailySummary(summaryData);
+    await sendDailySummary(summary);
     console.log('📊 Daily summary sent');
 
-    // Reset daily stats
-    stats.gemsDiscovered = 0;
-    stats.alertsSent = 0;
-    stats.criticalWarnings = 0;
   } catch (error) {
-    console.error('Error sending daily summary:', error.message);
+    console.error('❌ Error sending daily summary:', error);
   }
 }
 
@@ -210,26 +178,30 @@ async function sendDailySummaryReport() {
  * Get service statistics
  */
 export function getServiceStats() {
+  const discoveryStats = getDiscoveryStats();
+
   return {
     isRunning,
-    uptime: stats.startTime ? Date.now() - stats.startTime.getTime() : 0,
+    uptime: isRunning ? Date.now() - stats.startTime.getTime() : 0,
     gemsDiscovered: stats.gemsDiscovered,
     alertsSent: stats.alertsSent,
-    criticalWarnings: stats.criticalWarnings,
-    topGems: stats.topGems.slice(0, 5),
-    discoveryStats: getDiscoveryStats()
+    tokensFiltered: stats.tokensFiltered,  // NEW
+    liquidityCheckErrors: stats.liquidityCheckErrors,  // NEW
+    filterEfficiency: stats.gemsDiscovered > 0 
+      ? ((stats.tokensFiltered / (stats.gemsDiscovered + stats.tokensFiltered)) * 100).toFixed(2) + '%'
+      : '0%',  // NEW: Show what % of tokens are being filtered
+    topGems: stats.topGems,
+    discoveryStats
   };
 }
 
 /**
- * Get service status
+ * Health check endpoint
  */
-export function getServiceStatus() {
+export function healthCheck() {
   return {
-    running: isRunning,
-    startTime: stats.startTime,
+    status: isRunning ? 'healthy' : 'stopped',
+    uptime: isRunning ? Date.now() - stats.startTime.getTime() : 0,
     stats: getServiceStats()
   };
-} 
-
-startGemHunter();process.stdin.resume();
+}
