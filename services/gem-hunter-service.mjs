@@ -73,15 +73,14 @@ export async function startGemHunterService() {
   // Schedule daily summary
   scheduleDailySummary();
   
-  // Keep the process alive
-  setInterval(() => {
-    // This interval keeps the Node.js event loop active
-    // The WebSocket connections will handle the actual work
-  }, 60000); // Check every minute
-  
   console.log('[GEM-HUNTER] ✅ Gem Hunter service started');
   
-  return { success: true, message: 'AI Gem Hunter Service started successfully' };
+  // Return a never-resolving Promise to keep the process alive
+  // The WebSocket connections and intervals will keep the event loop active
+  return new Promise(() => {
+    // This Promise never resolves, keeping the process running indefinitely
+    // The service will continue running via WebSocket connections and scheduled tasks
+  });
 }
 
 /**
