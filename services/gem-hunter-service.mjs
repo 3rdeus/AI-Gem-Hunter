@@ -12,7 +12,7 @@ import {
   sendDailySummary,
   sendTestMessage
 } from '../lib/telegram-bot.mjs';
-import { checkLiquidity } from '../lib/liquidity-checker.js';
+import { checkLiquidity } from '../lib/liquidity-checker.mjs';
 
 /**
  * Service state
