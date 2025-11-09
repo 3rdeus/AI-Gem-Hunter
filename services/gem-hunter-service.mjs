@@ -232,11 +232,4 @@ export function getServiceStatus() {
   };
 } 
 
-<<<<<<< HEAD
 startGemHunter();process.stdin.resume();
-=======
-startGemHunter();
-process.stdin.resume();
-
-
->>>>>>> 3e8de9fb10fbf28a57bbed79f6f2c266f6a4c75e
