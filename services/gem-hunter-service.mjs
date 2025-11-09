@@ -36,18 +36,7 @@ export async function startGemHunter() {
 
   console.log('🚀 Starting AI Gem Hunter Service...');
   
-  // Send test message to confirm Telegram is working
-  const testResult = await sendTestMessage();
-  if (!testResult.success) {
-    console.error('❌ Telegram bot not configured properly');
-    return {
-      success: false,
-      message: 'Telegram bot configuration error',
-      error: testResult.error
-    };
-  }
 
-  console.log('✅ Telegram bot connected');
 
   // Start token discovery with callback
   discoveryWebSocket = startTokenDiscovery(handleGemDiscovered);
@@ -243,6 +232,11 @@ export function getServiceStatus() {
   };
 } 
 
+<<<<<<< HEAD
+startGemHunter();process.stdin.resume();
+=======
 startGemHunter();
 process.stdin.resume();
 
+
+>>>>>>> 3e8de9fb10fbf28a57bbed79f6f2c266f6a4c75e
