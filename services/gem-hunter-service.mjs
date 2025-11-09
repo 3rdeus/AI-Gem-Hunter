@@ -13,7 +13,7 @@ import {
 } from '../lib/telegram-bot.mjs';
 import { checkLiquidity } from '../lib/liquidity-checker.mjs';
 import { shouldAlert } from '../lib/token-scorer.mjs';
-import { buyViaBonkBot } from '../lib/bonk-bot.js';
+import { buyViaBonkBot } from '../lib/bonk-bot.mjs';
 
 /**
  * Trading configuration
