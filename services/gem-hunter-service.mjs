@@ -12,8 +12,9 @@ import {
   sendTestMessage
 } from '../lib/telegram-bot.mjs';
 import { checkLiquidity } from '../lib/liquidity-checker.mjs';
-import { shouldAlert } from '../lib/token-scorer.mjs';
+import { shouldAlert, getAlertTier } from '../lib/token-scorer.mjs';
 import { buyViaBonkBot } from '../lib/bonk-bot.mjs';
+import { saveGemDiscovery, markAlertSent, updateGemPerformance } from '../lib/gem-tracker.mjs';
 
 /**
  * Trading configuration
@@ -89,6 +90,9 @@ async function handleGemDiscovered(gemData) {
     console.log(`[GEM-HUNTER] Processing gem: ${gemData.tokenAddress}`);
     console.log(`[GEM-HUNTER] Score: ${gemData.gemScore}/100 - ${gemData.interpretation}`);
     
+    // Save ALL discovered gems to Supabase (even low-scoring ones for analytics)
+    await saveGemDiscovery(gemData);
+    
     // Step 1: Liquidity filter (already have liquidity from scoring data)
     const liquidityUSD = gemData.metrics.liquidity || 0;
     
@@ -127,8 +131,12 @@ async function handleGemDiscovered(gemData) {
     }
     
     // Step 4: Send Telegram alert
+    const alertTier = getAlertTier(gemData.gemScore);
     await sendGemAlertWithScore(gemData);
     serviceStats.alertsSent++;
+    
+    // Mark alert as sent in database
+    await markAlertSent(gemData.tokenAddress, alertTier.tier, gemData.gemScore, 'Alert sent via Telegram');
     
     console.log(`[GEM-HUNTER] 🎉 High-quality gem alert sent for ${gemData.tokenAddress}`);
     
@@ -186,8 +194,9 @@ async function executeAutomaticTrade(gemData) {
  * Send Telegram alert with scoring information
  */
 async function sendGemAlertWithScore(gemData) {
+  const alertTier = getAlertTier(gemData.gemScore);
   const message = `
-🔥 *HIGH-QUALITY GEM DETECTED* 🔥
+${alertTier.emoji} *${alertTier.label}* ${alertTier.emoji}
 
 *Score:* ${gemData.gemScore}/100
 ${gemData.interpretation}
