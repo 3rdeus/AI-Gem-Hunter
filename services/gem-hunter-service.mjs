@@ -15,6 +15,9 @@ import { checkLiquidity } from '../lib/liquidity-checker.mjs';
 import { shouldAlert, getAlertTier } from '../lib/token-scorer.mjs';
 import { buyViaBonkBot } from '../lib/bonk-bot.mjs';
 import { saveGemDiscovery, markAlertSent, updateGemPerformance } from '../lib/gem-tracker.mjs';
+import { startMomentumTracking } from '../lib/momentum-tracker.mjs';
+import { processMomentumAlerts } from '../lib/momentum-alerts.mjs';
+import { startWeeklyDigestScheduler } from '../lib/weekly-digest-scheduler.mjs';
 
 /**
  * Trading configuration
@@ -70,6 +73,14 @@ export async function startGemHunterService() {
   
   // Schedule daily summary
   scheduleDailySummary();
+  
+  // Start momentum tracking (re-scores every 6 hours)
+  console.log('[GEM-HUNTER] 🚀 Starting momentum tracking system...');
+  startMomentumTracking(6); // Re-score every 6 hours
+  
+  // Start weekly digest scheduler (Mondays at 9 AM)
+  console.log('[GEM-HUNTER] 📊 Starting weekly digest scheduler...');
+  startWeeklyDigestScheduler();
   
   console.log('[GEM-HUNTER] ✅ Gem Hunter service started');
   console.log('[GEM-HUNTER] 🔍 Starting token discovery with WebSocket connections...');
