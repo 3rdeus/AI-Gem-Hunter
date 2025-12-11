@@ -115,7 +115,34 @@ async function handleGemDiscovered(gemData) {
     
     console.log(`[GEM-HUNTER] ✅ Liquidity check passed: $${liquidityUSD.toFixed(2)}`);
     
-    // Step 2: Check if score is high enough for alert
+    // Step 2A: Check for Early Gem (experimental high-potential early-stage tokens)
+    const liquidityScore = gemData.scoreBreakdown.liquidity || 0;
+    const safetyScore = gemData.scoreBreakdown.safety || 0;
+    const volumePlusHoldersScore = gemData.scoreBreakdown.volumePlusHolders || 0;
+    const potentialScore = gemData.scoreBreakdown.potential || 0;
+    
+    const isEarlyGem =
+      liquidityScore >= 80 &&
+      safetyScore >= 80 &&
+      volumePlusHoldersScore < 40 &&
+      potentialScore >= 76;
+    
+    if (isEarlyGem) {
+      console.log(`[GEM-HUNTER] 🧪 EARLY GEM detected! Potential: ${potentialScore}/100`);
+      serviceStats.gemsDiscovered++;
+      
+      // Send Early Gem alert
+      await sendEarlyGemAlert(gemData);
+      serviceStats.alertsSent++;
+      
+      // Mark alert as sent
+      await markAlertSent(gemData.tokenAddress, 'early_gem', potentialScore, 'Early Gem alert sent via Telegram');
+      
+      console.log(`[GEM-HUNTER] 🧪 Early Gem alert sent for ${gemData.tokenAddress}`);
+      return; // Don't send regular alert for early gems
+    }
+    
+    // Step 2B: Check if score is high enough for regular alert (Good/Excellent)
     if (!shouldAlert(gemData.gemScore)) {
       console.log(`[GEM-HUNTER] ⚠️ Score too low for alert (${gemData.gemScore}/100)`);
       serviceStats.tokensFiltered++;
@@ -250,6 +277,60 @@ ${TRADING_CONFIG.enabled ? '🤖 *Auto-trade executing...*' : '⚠️ *Auto-trad
     await sendGemAlert(message);
   } catch (error) {
     console.error('[GEM-HUNTER] Error sending Telegram alert:', error);
+  }
+}
+
+/**
+ * Send Early Gem alert to Telegram
+ */
+async function sendEarlyGemAlert(gemData) {
+  const potentialScore = gemData.scoreBreakdown.potential || 0;
+  const liquidityScore = gemData.scoreBreakdown.liquidity || 0;
+  const safetyScore = gemData.scoreBreakdown.safety || 0;
+  const volumeScore = gemData.scoreBreakdown.volume || 0;
+  const holderScore = gemData.scoreBreakdown.holders || 0;
+  
+  const message = `
+🧪 *EARLY GEM (Experimental)*
+
+*Token Info:*
+• Name: ${gemData.basicData.name}
+• Symbol: ${gemData.basicData.symbol}
+• Address: \`${gemData.tokenAddress}\`
+• Source: ${gemData.source.toUpperCase()}
+
+*Potential Score:* ${potentialScore}/100
+
+*Score Breakdown:*
+• 💰 Liquidity: ${liquidityScore}/100 ${liquidityScore >= 80 ? '✅' : ''}
+• 🛡️ Safety: ${safetyScore}/100 ${safetyScore >= 80 ? '✅' : ''}
+• 📉 Volume: ${volumeScore}/100 ${volumeScore < 40 ? '⚠️ Low' : ''}
+• 👥 Holders: ${holderScore}/100 ${holderScore < 40 ? '⚠️ Low' : ''}
+
+*Metrics:*
+• Liquidity: $${gemData.metrics.liquidity.toLocaleString()}
+• 24h Volume: $${gemData.metrics.volume24h.toLocaleString()}
+• Holders: ${gemData.metrics.holders}
+• Market Cap: $${gemData.metrics.marketCap.toLocaleString()}
+
+*Social Links:*
+${gemData.social.website ? `• Website: ${gemData.social.website}` : ''}
+${gemData.social.twitter ? `• Twitter: ${gemData.social.twitter}` : ''}
+${gemData.social.telegram ? `• Telegram: ${gemData.social.telegram}` : ''}
+
+*View on:*
+• [Birdeye](https://birdeye.so/token/${gemData.tokenAddress})
+• [DexScreener](https://dexscreener.com/solana/${gemData.tokenAddress})
+
+⚠️ *Brand-new token with strong liquidity + safety but very low volume/holders.*
+⚠️ *High risk. Treat as experimental, not a standard gem.*
+⚠️ *DYOR - Not Financial Advice*
+  `.trim();
+
+  try {
+    await sendGemAlert(message);
+  } catch (error) {
+    console.error('[GEM-HUNTER] Error sending Early Gem alert:', error);
   }
 }
 
