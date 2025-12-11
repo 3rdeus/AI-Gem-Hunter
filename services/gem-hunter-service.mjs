@@ -18,6 +18,9 @@ import { saveGemDiscovery, markAlertSent, updateGemPerformance } from '../lib/ge
 import { startMomentumTracking } from '../lib/momentum-tracker.mjs';
 import { processMomentumAlerts } from '../lib/momentum-alerts.mjs';
 import { startWeeklyDigestScheduler } from '../lib/weekly-digest-scheduler.mjs';
+import { startWhaleTracking } from '../lib/whale-tracker.mjs';
+import { startLiquidityMonitoring, recordLiquiditySnapshot, detectLiquidityInflection } from '../lib/liquidity-monitor.mjs';
+import { analyzeTokenHolderQuality, calculateEnhancedHolderScore } from '../lib/holder-quality-analyzer.mjs';
 
 /**
  * Trading configuration
@@ -82,6 +85,14 @@ export async function startGemHunterService() {
   console.log('[GEM-HUNTER] 📊 Starting weekly digest scheduler...');
   startWeeklyDigestScheduler();
   
+  // Start whale wallet tracking (Phase 1)
+  console.log('[GEM-HUNTER] 🐋 Starting whale wallet tracking...');
+  startWhaleTracking();
+  
+  // Start liquidity monitoring (Phase 1)
+  console.log('[GEM-HUNTER] 📊 Starting liquidity inflection monitoring...');
+  startLiquidityMonitoring();
+  
   console.log('[GEM-HUNTER] ✅ Gem Hunter service started');
   console.log('[GEM-HUNTER] 🔍 Starting token discovery with WebSocket connections...');
   
@@ -103,6 +114,26 @@ async function handleGemDiscovered(gemData) {
     
     // Save ALL discovered gems to Supabase (even low-scoring ones for analytics)
     await saveGemDiscovery(gemData);
+    
+    // Phase 1: Record liquidity snapshot for inflection detection
+    await recordLiquiditySnapshot(
+      gemData.tokenAddress,
+      gemData.metrics.liquidity || 0,
+      gemData.metrics.volume24h || 0,
+      gemData.metrics.price || 0
+    );
+    
+    // Phase 1: Analyze holder quality
+    const holderQuality = await analyzeTokenHolderQuality(
+      gemData.tokenAddress,
+      gemData.metrics.holders || 0
+    );
+    
+    // Phase 1: Detect liquidity inflections
+    const liquidityInflection = await detectLiquidityInflection(
+      gemData.tokenAddress,
+      gemData.metrics.liquidity || 0
+    );
     
     // Step 1: Liquidity filter (already have liquidity from scoring data)
     const liquidityUSD = gemData.metrics.liquidity || 0;
