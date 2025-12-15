@@ -3,10 +3,10 @@
   "version": "1.0.0",
   "description": "Fast, lightweight API server for Solana token safety checks with AI analysis",
   "main": "api/check-token.js",
-
   "scripts": {
     "dev": "node --watch api/check-token.js",
-    "start": "node services/start-service.js",    "test": "node test/test-api.js"
+    "start": "node services/start-service.js",
+    "test": "node test/test-api.js"
   },
   "keywords": [
     "solana",
@@ -21,7 +21,9 @@
     "@anthropic-ai/sdk": "^0.27.0",
     "@supabase/supabase-js": "^2.45.0",
     "dotenv": "^16.4.0",
-    "openai": "^4.0.0",    "ws": "^8.18.0"
+    "openai": "^4.0.0",
+    "pg": "^8.16.3",
+    "ws": "^8.18.0"
   },
   "engines": {
     "node": ">=18.0.0"
