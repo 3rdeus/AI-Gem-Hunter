@@ -80,7 +80,44 @@ function startGemHunterService() {
 
   console.log('✅ Gem Hunter service started');
 
-  let perfTrackerProcess = null;
+  let
+    
+    /**
+ * Start the performance tracker service
+ */
+function startPerfTrackerService() {
+  console.log('📊 Starting Performance Tracker Service...');
+  
+  perfTrackerProcess = exec('node --experimental-modules services/performance-tracker-service.mjs', (error, stdout, stderr) => {
+    if (error) {
+      console.error(`❌ Perf Tracker error: ${error.message}`);
+      return;
+    }
+    if (stderr) {
+      console.error(`⚠️ Perf Tracker stderr: ${stderr}`);
+    }
+    console.log(`📝 Perf Tracker output: ${stdout}`);
+  });
+
+  perfTrackerProcess.stdout.on('data', (data) => {
+    console.log(`[PERF-TRACKER] ${data.toString().trim()}`);
+  });
+
+  perfTrackerProcess.stderr.on('data', (data) => {
+    console.error(`[PERF-TRACKER ERROR] ${data.toString().trim()}`);
+  });
+
+  perfTrackerProcess.on('exit', (code) => {
+    console.log(`⚠️ Performance Tracker exited with code ${code}`);
+    // Restart after 5 seconds if it crashes
+    setTimeout(() => {
+      console.log('🔄 Restarting Performance Tracker...');
+      startPerfTrackerService();
+    }, 5000);
+  });
+
+  console.log('✅ Performance Tracker service started');
+}perfTrackerProcess = null;
 
 /**
  * Start the performance tracker service
