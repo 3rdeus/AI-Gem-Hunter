@@ -8,6 +8,7 @@ const { exec } = require('child_process');
 
 const PORT = process.env.PORT || 8080;
 let serviceProcess = null;
+let perfTrackerProcess = null;
 let serviceStartTime = Date.now();
 
 /**
