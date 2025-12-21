@@ -8,7 +8,6 @@ const { exec } = require('child_process');
 
 const PORT = process.env.PORT || 8080;
 let serviceProcess = null;
-let perfTrackerProcess = null;
 let serviceStartTime = Date.now();
 
 /**
@@ -79,82 +78,6 @@ function startGemHunterService() {
   });
 
   console.log('✅ Gem Hunter service started');
-
-  let
-    
-    /**
- * Start the performance tracker service
- */
-function startPerfTrackerService() {
-  console.log('📊 Starting Performance Tracker Service...');
-  
-  perfTrackerProcess = exec('node --experimental-modules services/performance-tracker-service.mjs', (error, stdout, stderr) => {
-    if (error) {
-      console.error(`❌ Perf Tracker error: ${error.message}`);
-      return;
-    }
-    if (stderr) {
-      console.error(`⚠️ Perf Tracker stderr: ${stderr}`);
-    }
-    console.log(`📝 Perf Tracker output: ${stdout}`);
-  });
-
-  perfTrackerProcess.stdout.on('data', (data) => {
-    console.log(`[PERF-TRACKER] ${data.toString().trim()}`);
-  });
-
-  perfTrackerProcess.stderr.on('data', (data) => {
-    console.error(`[PERF-TRACKER ERROR] ${data.toString().trim()}`);
-  });
-
-  perfTrackerProcess.on('exit', (code) => {
-    console.log(`⚠️ Performance Tracker exited with code ${code}`);
-    // Restart after 5 seconds if it crashes
-    setTimeout(() => {
-      console.log('🔄 Restarting Performance Tracker...');
-      startPerfTrackerService();
-    }, 5000);
-  });
-
-  console.log('✅ Performance Tracker service started');
-}perfTrackerProcess = null;
-
-/**
- * Start the performance tracker service
- */
-function startPerfTrackerService() {
-  console.log('📊 Starting Performance Tracker Service...');
-  
-  perfTrackerProcess = exec('node --experimental-modules services/performance-tracker-service.mjs', (error, stdout, stderr) => {
-    if (error) {
-      console.error(`❌ Perf Tracker error: ${error.message}`);
-      return;
-    }
-    if (stderr) {
-      console.error(`⚠️ Perf Tracker stderr: ${stderr}`);
-    }
-    console.log(`📝 Perf Tracker output: ${stdout}`);
-  });
-
-  perfTrackerProcess.stdout.on('data', (data) => {
-    console.log(`[PERF-TRACKER] ${data.toString().trim()}`);
-  });
-
-  perfTrackerProcess.stderr.on('data', (data) => {
-    console.error(`[PERF-TRACKER ERROR] ${data.toString().trim()}`);
-  });
-
-  perfTrackerProcess.on('exit', (code) => {
-    console.log(`⚠️ Performance Tracker exited with code ${code}`);
-    // Restart after 5 seconds if it crashes
-    setTimeout(() => {
-      console.log('🔄 Restarting Performance Tracker...');
-      startPerfTrackerService();
-    }, 5000);
-  });
-
-  console.log('✅ Performance Tracker service started');
-}
 }
 
 /**
@@ -170,7 +93,6 @@ async function main() {
 
     // Start gem hunter service
     startGemHunterService();
-        startPerfTrackerService();
     
     console.log('💎 AI Gem Hunter is now running!');
 
@@ -178,9 +100,6 @@ async function main() {
     process.on('SIGTERM', () => {
       console.log('📴 Received SIGTERM, shutting down gracefully...');
       if (serviceProcess) {
-              if (perfTrackerProcess) {
-                        perfTrackerProcess.kill();
-                      }
         serviceProcess.kill();
       }
       healthServer.close(() => {
@@ -192,9 +111,6 @@ async function main() {
     process.on('SIGINT', () => {
       console.log('📴 Received SIGINT, shutting down gracefully...');
       if (serviceProcess) {
-              if (perfTrackerProcess) {
-        perfTrackerProcess.kill();
-      }
         serviceProcess.kill();
       }
       healthServer.close(() => {
