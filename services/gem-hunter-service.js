@@ -11,7 +11,7 @@ import {
   sendDailySummary,
   sendTestMessage
 } from '../lib/telegram-bot.js';
-import { saveGemDiscovery, markAlertSent } from '../lib/gem-tracker.mjs';
+import { saveGemDiscovery, markAlertSent, getDiscoveredGems } from '../lib/gem-tracker.mjs';
 
 /**
  * Service state
@@ -195,31 +195,57 @@ async function checkForCriticalWarnings(gemData) {
  */
 async function sendDailySummaryReport() {
   try {
+    console.log('[DAILY-SUMMARY] Generating daily summary...');
+    
+    // Calculate 24 hours ago
+    const now = new Date();
+    const twentyFourHoursAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+    
+    // Query database for gems discovered in last 24 hours
+    const { success: gemsSuccess, data: recentGems, error: gemsError, count: gemsCount } = await getDiscoveredGems({
+      startDate: twentyFourHoursAgo.toISOString(),
+      limit: 1000 // Get all from last 24h
+    });
+    
+    if (!gemsSuccess) {
+      console.error('[DAILY-SUMMARY] Failed to fetch gems:', gemsError);
+      return;
+    }
+    
+    // Count gems with alerts sent
+    const gemsWithAlerts = recentGems?.filter(gem => gem.alert_sent) || [];
+    const alertsCount = gemsWithAlerts.length;
+    
+    // Get top 5 gems by score
+    const topGems = (recentGems || [])
+      .sort((a, b) => (b.initial_score || 0) - (a.initial_score || 0))
+      .slice(0, 5)
+      .map(gem => ({
+        name: gem.name || 'Unknown',
+        symbol: gem.symbol || 'N/A',
+        score: gem.initial_score || 0
+      }));
+    
     const summaryData = {
-      gemsDiscovered: stats.gemsDiscovered,
-      alertsSent: stats.alertsSent,
-      topGems: stats.topGems.slice(0, 5),
+      gemsDiscovered: gemsCount || 0,
+      alertsSent: alertsCount,
+      topGems: topGems,
       performance: {
-        avgScore: stats.topGems.length > 0
-          ? stats.topGems.reduce((sum, gem) => sum + gem.score, 0) / stats.topGems.length
+        avgScore: topGems.length > 0
+          ? topGems.reduce((sum, gem) => sum + gem.score, 0) / topGems.length
           : 0,
         accuracy: 0, // Would calculate from historical data
-        bestPerformer: stats.topGems[0]?.name || 'N/A'
+        bestPerformer: topGems[0]?.name || 'N/A'
       }
     };
-
+    
     await sendDailySummary(summaryData);
-    console.log('📊 Daily summary sent');
-
-    // Reset daily stats
-    stats.gemsDiscovered = 0;
-    stats.alertsSent = 0;
-    stats.criticalWarnings = 0;
+    console.log('[DAILY-SUMMARY] ✅ Daily summary sent successfully');
+    
   } catch (error) {
-    console.error('Error sending daily summary:', error.message);
+    console.error('[DAILY-SUMMARY] Error sending daily summary:', error.message);
   }
 }
-
 /**
  * Get service statistics
  */
