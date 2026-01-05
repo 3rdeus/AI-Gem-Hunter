@@ -129,6 +129,14 @@ async function handleGemDiscovered(gemData) {
       if (alertResult.success) {
         stats.alertsSent++;
         console.log(`✅ Gem alert sent: ${gemData.basicData.name}`);
+        
+        // Mark alert as sent in database
+        try {
+          await markAlertSent(gemData.tokenAddress);
+          console.log(`[GEM-TRACKER] ✅ Marked alert as sent for ${gemData.tokenAddress}`);
+        } catch (markError) {
+          console.error(`[GEM-TRACKER] ❌ Failed to mark alert as sent:`, markError.message);
+        }
       } else {
         console.error(`❌ Failed to send gem alert: ${alertResult.error}`);
       }
