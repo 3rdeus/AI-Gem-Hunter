@@ -4,10 +4,7 @@
  * Call with: https://token-safety-api.vercel.app/api/trigger-rescore
  */
 
-import { rescoreAllTokens } from '../lib/momentum-tracker.mjs';
-import { processMomentumAlerts } from '../lib/momentum-alerts.mjs';
-
-export default async function handler(req, res) {
+module.exports = async function handler(req, res) {
   // Only allow POST requests
   if (req.method !== 'POST') {
     return res.status(405).json({ 
@@ -19,6 +16,10 @@ export default async function handler(req, res) {
   console.log('[TRIGGER-RESCORE] Manual re-score triggered via API');
 
   try {
+    // Dynamic import for ESM modules
+    const { rescoreAllTokens } = await import('../lib/momentum-tracker.mjs');
+    const { processMomentumAlerts } = await import('../lib/momentum-alerts.mjs');
+
     // Run the re-score
     const result = await rescoreAllTokens();
 
@@ -56,4 +57,4 @@ export default async function handler(req, res) {
       message: error.message
     });
   }
-}
+};
