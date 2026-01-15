@@ -10,7 +10,7 @@ import {
   sendSmartMoneyAlert,
   sendDailySummary,
   sendTestMessage
-} from '../lib/telegram-bot.js';
+} from '../lib/telegram-bot.mjs';
 import { saveGemDiscovery, markAlertSent, getDiscoveredGems } from '../lib/gem-tracker.mjs';
 import { createClient } from '@supabase/supabase-js';
 
