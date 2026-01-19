@@ -9,6 +9,7 @@ const { exec } = require('child_process');
 const PORT = process.env.PORT || 8080;
 let serviceProcess = null;
 let perfTrackerProcess = null;
+let gmgnMonitoringProcess = null;
 let serviceStartTime = Date.now();
 
 /**
@@ -122,6 +123,45 @@ function startPerfTrackerService() {
  * Main entry point
  */
 async function main() {
+
+  /**
+ * Start the GMGN monitoring service
+ */
+function startGmgnMonitoringService() {
+  console.log('📈 Starting GMGN Monitoring Service...');
+
+  gmgnMonitoringProcess = exec('node --experimental-modules services/gmgn-monitoring-service.mjs', (error, stdout, stderr) => {
+    if (error) {
+      console.error(`❌ GMGN Monitor error: ${error.message}`);
+      return;
+    }
+
+    if (stderr) {
+      console.error(`⚠️ GMGN Monitor stderr: ${stderr}`);
+    }
+
+    console.log(`📊 GMGN Monitor output: ${stdout}`);
+  });
+
+  gmgnMonitoringProcess.stdout.on('data', (data) => {
+    console.log(`[GMGN-MONITOR] ${data.toString().trim()}`);
+  });
+
+  gmgnMonitoringProcess.stderr.on('data', (data) => {
+    console.error(`[GMGN-MONITOR ERROR] ${data.toString().trim()}`);
+  });
+
+  gmgnMonitoringProcess.on('exit', (code) => {
+    console.log(`⚠️ GMGN Monitor exited with code ${code}`);
+    // Restart after 5 seconds if it crashes
+    setTimeout(() => {
+      console.log('🔄 Restarting GMGN Monitor...');
+      startGmgnMonitoringService();
+    }, 5000);
+  });
+
+  console.log('✅ GMGN Monitoring service started');
+}
   try {
     console.log('🎯 Initializing AI Gem Hunter Service...');
     
@@ -136,6 +176,7 @@ async function main() {
     console.log('💎 AI Gem Hunter is now running!');
 
     // Handle graceful shutdown
+      startGmgnMonitoringService();
     process.on('SIGTERM', () => {
       console.log('📴 Received SIGTERM, shutting down gracefully...');
       if (serviceProcess) {
@@ -146,6 +187,10 @@ async function main() {
       }
       healthServer.close(() => {
         console.log('👋 Service stopped');
+        
+    if (gmgnMonitoringProcess) {
+      gmgnMonitoringProcess.kill();
+    }
         process.exit(0);
       });
     });
@@ -156,6 +201,10 @@ async function main() {
         serviceProcess.kill();
             if (perfTrackerProcess) {
       perfTrackerProcess.kill();
+    }
+        
+    if (gmgnMonitoringProcess) {
+      gmgnMonitoringProcess.kill();
     }
       }
       healthServer.close(() => {
