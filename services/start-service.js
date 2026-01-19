@@ -180,7 +180,7 @@ function startGmgnMonitoringService() {
     process.on('SIGTERM', () => {
       console.log('📴 Received SIGTERM, shutting down gracefully...');
       if (serviceProcess) {
-        serviceProcess.kill();
+        // serviceProcess.kill();
             if (perfTrackerProcess) {
       perfTrackerProcess.kill();
     }
