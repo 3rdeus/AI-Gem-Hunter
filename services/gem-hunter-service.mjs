@@ -9,7 +9,8 @@ import {
   sendCriticalWarning,
   sendSmartMoneyAlert,
   sendDailySummary,
-  sendTestMessage
+  sendTestMessage,
+  sendEntryGateRejection
 } from '../lib/telegram-bot.mjs';
 import { checkLiquidity } from '../lib/liquidity-checker.mjs';
 import { shouldAlert, getAlertTier } from '../lib/token-scorer.mjs';
@@ -21,6 +22,7 @@ import { startWeeklyDigestScheduler } from '../lib/weekly-digest-scheduler.mjs';
 import { startWhaleTracking } from '../lib/whale-tracker.mjs';
 import { startLiquidityMonitoring, recordLiquiditySnapshot, detectLiquidityInflection } from '../lib/liquidity-monitor.mjs';
 import { analyzeTokenHolderQuality, calculateEnhancedHolderScore } from '../lib/holder-quality-analyzer.mjs';
+import { evaluateEntry, HARD_RULES } from '../lib/entry-gate.mjs';
 
 /**
  * Trading configuration
@@ -223,17 +225,42 @@ async function handleGemDiscovered(gemData) {
 
 /**
  * Execute automatic trade via BoNK Bot
+ * REQUIRES: All entry gate checks must pass before trade execution
  */
 async function executeAutomaticTrade(gemData) {
   try {
-    console.log(`[GEM-HUNTER] 🤖 Executing automatic trade for ${gemData.tokenAddress}`);
+    console.log(`[GEM-HUNTER] 🤖 Evaluating trade for ${gemData.tokenAddress}`);
     
+    // ═══════════════════════════════════════════════════════════
+    // ENTRY GATE - ALL CHECKS MUST PASS
+    // ═══════════════════════════════════════════════════════════
+    const gateResult = await evaluateEntry(
+      gemData.tokenAddress,
+      gemData.createdAt ? new Date(gemData.createdAt).getTime() : null
+    );
+    
+    if (!gateResult.passed) {
+      serviceStats.tokensFiltered++;
+      console.log(`[GEM-HUNTER] 🚫 ENTRY GATE REJECTED: ${gateResult.reason}`);
+      console.log(`[GEM-HUNTER] 🚫 Risk Level: ${gateResult.riskLevel}`);
+      
+      // Send rejection alert for transparency
+      await sendEntryGateRejection(gemData, gateResult);
+      return;
+    }
+    
+    console.log(`[GEM-HUNTER] ✅ ENTRY GATE APPROVED - Risk Level: ${gateResult.riskLevel}`);
+    
+    // ═══════════════════════════════════════════════════════════
+    // EXECUTE TRADE
+    // ═══════════════════════════════════════════════════════════
     const tradeParams = {
       tokenAddress: gemData.tokenAddress,
       amountSOL: TRADING_CONFIG.amountSOL,
       slippage: TRADING_CONFIG.slippage,
       profitTargets: TRADING_CONFIG.profitTargets,
-      stopLoss: TRADING_CONFIG.stopLoss
+      stopLoss: TRADING_CONFIG.stopLoss,
+      entryGateResult: gateResult // Include gate result for logging
     };
     
     const result = await buyViaBonkBot(tradeParams);
