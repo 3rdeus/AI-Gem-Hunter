@@ -3,6 +3,8 @@
  * Starts HTTP server for DigitalOcean health checks and runs gem hunter service
  */
 
+require('dotenv').config();
+
 const http = require('http');
 const { exec } = require('child_process');
 

@@ -3,6 +3,8 @@
  * Integrates real-time discovery with AI scoring, Telegram notifications, and automatic trading
  */
 
+import 'dotenv/config';
+
 import { startTokenDiscovery, getDiscoveryStats } from '../lib/real-time-discovery.mjs';
 import {
   sendGemAlert,
