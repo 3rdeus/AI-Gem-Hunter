@@ -1,0 +1,31 @@
+# Dependencies
+node_modules/
+
+# Environment (contains secrets!)
+.env
+.env.local
+.env.*.local
+
+# Logs
+logs/*
+!logs/.gitkeep
+*.log
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Build
+dist/
+build/
+coverage/
+.nyc_output/
+
+# PM2
+.pm2/
