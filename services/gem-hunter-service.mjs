@@ -26,6 +26,7 @@ import { startWeeklyDigestScheduler } from '../lib/weekly-digest-scheduler.mjs';
 // import { startLiquidityMonitoring, recordLiquiditySnapshot, detectLiquidityInflection } from '../lib/liquidity-monitor.mjs';
 // import { analyzeTokenHolderQuality, calculateEnhancedHolderScore } from '../lib/holder-quality-analyzer.mjs';
 import { evaluateEntry, HARD_RULES } from '../lib/entry-gate.mjs';
+import { getTokenSmartMoney } from '../lib/nansen-api.js';
 
 /**
  * Trading configuration
@@ -189,6 +190,23 @@ async function handleGemDiscovered(gemData) {
       serviceStats.topGems = serviceStats.topGems.slice(0, 10);
     }
     
+    // Step 3.5: Check Nansen smart money flows (if API key configured)
+    let smartMoneyData = null;
+    if (process.env.NANSEN_API_KEY) {
+      try {
+        console.log(`[GEM-HUNTER] 🧠 Checking Nansen smart money for ${gemData.tokenAddress}...`);
+        smartMoneyData = await getTokenSmartMoney(gemData.tokenAddress);
+        if (smartMoneyData?.success) {
+          console.log(`[GEM-HUNTER] 💰 Smart money: ${smartMoneyData.data.smart_wallet_count} wallets, net flow: $${smartMoneyData.data.net_flow_24h?.toFixed(2) || 0}`);
+        }
+      } catch (e) {
+        console.log(`[GEM-HUNTER] ⚠️ Nansen check failed: ${e.message}`);
+      }
+    }
+    
+    // Add smart money data to gemData for alert
+    gemData.smartMoney = smartMoneyData?.data || null;
+    
     // Step 4: Send Telegram alert
     const alertTier = getAlertTier(gemData.gemScore);
     await sendGemAlertWithScore(gemData);
@@ -314,6 +332,13 @@ ${gemData.social.telegram ? `• Telegram: ${gemData.social.telegram}` : ''}
 • [Birdeye](https://birdeye.so/token/${gemData.tokenAddress})
 • [DexScreener](https://dexscreener.com/solana/${gemData.tokenAddress})
 
+${gemData.smartMoney ? `
+*🧠 Nansen Smart Money:*
+• Smart Wallets: ${gemData.smartMoney.smart_wallet_count || 0}
+• 24h Inflow: $${(gemData.smartMoney.smart_money_inflow_24h || 0).toLocaleString()}
+• 24h Outflow: $${(gemData.smartMoney.smart_money_outflow_24h || 0).toLocaleString()}
+• Net Flow: $${(gemData.smartMoney.net_flow_24h || 0).toLocaleString()}
+` : ''}
 ${TRADING_CONFIG.enabled ? '🤖 *Auto-trade executing...*' : '⚠️ *Auto-trade disabled - manual action required*'}
 
 ⚠️ *DYOR - Not Financial Advice*
