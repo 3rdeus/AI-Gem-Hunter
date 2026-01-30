@@ -177,8 +177,10 @@ function startGmgnMonitoringService() {
     
     console.log('💎 AI Gem Hunter is now running!');
 
+    // DISABLED: GMGN WebSocket gets 403 blocked
+    // startGmgnMonitoringService();
+
     // Handle graceful shutdown
-      startGmgnMonitoringService();
     process.on('SIGTERM', () => {
       console.log('📴 Received SIGTERM, shutting down gracefully...');
       if (serviceProcess) {
