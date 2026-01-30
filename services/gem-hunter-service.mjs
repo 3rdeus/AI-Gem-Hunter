@@ -27,6 +27,7 @@ import { startWeeklyDigestScheduler } from '../lib/weekly-digest-scheduler.mjs';
 // import { analyzeTokenHolderQuality, calculateEnhancedHolderScore } from '../lib/holder-quality-analyzer.mjs';
 import { evaluateEntry, HARD_RULES } from '../lib/entry-gate.mjs';
 import { getTokenSmartMoney } from '../lib/nansen-api.js';
+import { evaluateForAgents, executeAgentTrade, isAutoTradeEnabled, getSquadStatus, generateCommanderReport } from '../lib/agent-squad.mjs';
 
 /**
  * Trading configuration
@@ -217,9 +218,30 @@ async function handleGemDiscovered(gemData) {
     
     console.log(`[GEM-HUNTER] 🎉 High-quality gem alert sent for ${gemData.tokenAddress}`);
     
-    // Step 5: Execute automatic trade via BoNK Bot (if enabled)
-    if (TRADING_CONFIG.enabled) {
-      await executeAutomaticTrade(gemData);
+    // Step 5: Evaluate and execute via Agent Squad
+    if (isAutoTradeEnabled()) {
+      const agentMatches = evaluateForAgents(gemData);
+      
+      if (agentMatches.length > 0) {
+        // Execute with the highest-tier agent that matched
+        const topAgent = agentMatches[0]; // Sniper > Hunter > Scout priority
+        console.log(`[GEM-HUNTER] 🎖️ Agent ${topAgent.config.name} matched: ${topAgent.reason}`);
+        
+        // Run entry gate check before real trades
+        if (!topAgent.config.paperTrade) {
+          const gateResult = await evaluateEntry(gemData.tokenAddress);
+          if (!gateResult.passed) {
+            console.log(`[GEM-HUNTER] 🚫 Entry gate rejected: ${gateResult.reason}`);
+            await sendEntryGateRejection(gemData, gateResult);
+            return;
+          }
+        }
+        
+        // Execute the trade
+        await executeAgentTrade(gemData, topAgent);
+      } else {
+        console.log(`[GEM-HUNTER] ⚠️ No agents matched for score ${gemData.gemScore}`);
+      }
     } else {
       console.log(`[GEM-HUNTER] ⚠️ Auto-trading disabled - skipping trade execution`);
     }
