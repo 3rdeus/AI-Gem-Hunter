@@ -21,8 +21,11 @@ let serviceProcess = null;
 let perfTrackerProcess = null;
 let serviceStartTime = Date.now();
 
+const fs = require('fs');
+const path = require('path');
+
 /**
- * Create HTTP server for health checks
+ * Create HTTP server for health checks and dashboard
  */
 function createHealthServer() {
   const server = http.createServer((req, res) => {
@@ -37,6 +40,18 @@ function createHealthServer() {
         mode: USE_VELOCITY_HUNTER ? 'velocity' : 'legacy',
         timestamp: new Date().toISOString()
       }));
+    } else if (req.url === '/dashboard.html' || req.url === '/dashboard') {
+      // Serve the dashboard
+      const dashboardPath = path.join(__dirname, '..', 'api', 'dashboard.html');
+      fs.readFile(dashboardPath, 'utf8', (err, data) => {
+        if (err) {
+          res.writeHead(404, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ error: 'Dashboard not found' }));
+        } else {
+          res.writeHead(200, { 'Content-Type': 'text/html' });
+          res.end(data);
+        }
+      });
     } else {
       res.writeHead(404, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ error: 'Not found' }));
