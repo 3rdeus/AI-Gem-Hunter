@@ -1,6 +1,6 @@
 /**
  * Service Wrapper with Health Check Server
- * Starts HTTP server for DigitalOcean health checks and runs gem hunter service
+ * Starts HTTP server for health checks and runs the trading service
  */
 
 require('dotenv').config();
@@ -8,10 +8,17 @@ require('dotenv').config();
 const http = require('http');
 const { exec } = require('child_process');
 
-const PORT = process.env.PORT || 8080;
+const PORT = process.env.PORT || 3000;
+
+// Choose which service to run
+const USE_VELOCITY_HUNTER = process.env.USE_VELOCITY_HUNTER === 'true';
+const SERVICE_SCRIPT = USE_VELOCITY_HUNTER 
+  ? 'services/velocity-hunter-service.mjs'
+  : 'services/gem-hunter-service.mjs';
+const SERVICE_NAME = USE_VELOCITY_HUNTER ? 'Velocity Hunter' : 'AI Gem Hunter';
+
 let serviceProcess = null;
 let perfTrackerProcess = null;
-let gmgnMonitoringProcess = null;
 let serviceStartTime = Date.now();
 
 /**
@@ -21,18 +28,16 @@ function createHealthServer() {
   const server = http.createServer((req, res) => {
     const uptime = Math.floor((Date.now() - serviceStartTime) / 1000);
     
-    // Health check endpoint
     if (req.url === '/health' || req.url === '/') {
       res.writeHead(200, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({
         status: 'healthy',
-        service: 'AI Gem Hunter',
+        service: SERVICE_NAME,
         uptime: uptime,
+        mode: USE_VELOCITY_HUNTER ? 'velocity' : 'legacy',
         timestamp: new Date().toISOString()
       }));
-    }
-    // 404 for other routes
-    else {
+    } else {
       res.writeHead(404, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ error: 'Not found' }));
     }
@@ -46,13 +51,13 @@ function createHealthServer() {
 }
 
 /**
- * Start the gem hunter service as a child process
+ * Start the main trading service
  */
-function startGemHunterService() {
-  console.log('🎯 Starting AI Gem Hunter Service...');
+function startMainService() {
+  console.log(`🎯 Starting ${SERVICE_NAME}...`);
+  console.log(`📜 Script: ${SERVICE_SCRIPT}`);
   
-  // Start the service in the background
-  serviceProcess = exec('node --experimental-modules services/gem-hunter-service.mjs', (error, stdout, stderr) => {
+  serviceProcess = exec(`node --experimental-modules ${SERVICE_SCRIPT}`, (error, stdout, stderr) => {
     if (error) {
       console.error(`❌ Service error: ${error.message}`);
       return;
@@ -60,35 +65,37 @@ function startGemHunterService() {
     if (stderr) {
       console.error(`⚠️ Service stderr: ${stderr}`);
     }
-    console.log(`📝 Service output: ${stdout}`);
   });
 
-  // Forward service output to console
   serviceProcess.stdout.on('data', (data) => {
-    console.log(`[GEM-HUNTER] ${data.toString().trim()}`);
+    console.log(data.toString().trim());
   });
 
   serviceProcess.stderr.on('data', (data) => {
-    console.error(`[GEM-HUNTER ERROR] ${data.toString().trim()}`);
+    console.error(data.toString().trim());
   });
 
   serviceProcess.on('exit', (code) => {
-    console.log(`⚠️ Gem Hunter service exited with code ${code}`);
+    console.log(`⚠️ ${SERVICE_NAME} exited with code ${code}`);
     // Restart after 5 seconds if it crashes
     setTimeout(() => {
-      console.log('🔄 Restarting Gem Hunter service...');
-      startGemHunterService();
+      console.log(`🔄 Restarting ${SERVICE_NAME}...`);
+      startMainService();
     }, 5000);
   });
 
-  console.log('✅ Gem Hunter service started');
+  console.log(`✅ ${SERVICE_NAME} started`);
 }
 
-
 /**
- * Start the performance tracker service
+ * Start performance tracker (optional)
  */
 function startPerfTrackerService() {
+  if (USE_VELOCITY_HUNTER) {
+    // Velocity hunter has built-in tracking, skip legacy tracker
+    return;
+  }
+  
   console.log('📊 Starting Performance Tracker Service...');
   
   perfTrackerProcess = exec('node --experimental-modules services/performance-tracker-service.mjs', (error, stdout, stderr) => {
@@ -96,10 +103,6 @@ function startPerfTrackerService() {
       console.error(`❌ Perf Tracker error: ${error.message}`);
       return;
     }
-    if (stderr) {
-      console.error(`⚠️ Perf Tracker stderr: ${stderr}`);
-    }
-    console.log(`📝 Perf Tracker output: ${stdout}`);
   });
 
   perfTrackerProcess.stdout.on('data', (data) => {
@@ -112,7 +115,6 @@ function startPerfTrackerService() {
 
   perfTrackerProcess.on('exit', (code) => {
     console.log(`⚠️ Performance Tracker exited with code ${code}`);
-    // Restart after 5 seconds if it crashes
     setTimeout(() => {
       console.log('🔄 Restarting Performance Tracker...');
       startPerfTrackerService();
@@ -121,101 +123,47 @@ function startPerfTrackerService() {
 
   console.log('✅ Performance Tracker service started');
 }
+
 /**
  * Main entry point
  */
 async function main() {
-
-  /**
- * Start the GMGN monitoring service
- */
-function startGmgnMonitoringService() {
-  console.log('📈 Starting GMGN Monitoring Service...');
-
-  gmgnMonitoringProcess = exec('node --experimental-modules services/gmgn-monitoring-service.mjs', (error, stdout, stderr) => {
-    if (error) {
-      console.error(`❌ GMGN Monitor error: ${error.message}`);
-      return;
-    }
-
-    if (stderr) {
-      console.error(`⚠️ GMGN Monitor stderr: ${stderr}`);
-    }
-
-    console.log(`📊 GMGN Monitor output: ${stdout}`);
-  });
-
-  gmgnMonitoringProcess.stdout.on('data', (data) => {
-    console.log(`[GMGN-MONITOR] ${data.toString().trim()}`);
-  });
-
-  gmgnMonitoringProcess.stderr.on('data', (data) => {
-    console.error(`[GMGN-MONITOR ERROR] ${data.toString().trim()}`);
-  });
-
-  gmgnMonitoringProcess.on('exit', (code) => {
-    console.log(`⚠️ GMGN Monitor exited with code ${code}`);
-    // Restart after 5 seconds if it crashes
-    setTimeout(() => {
-      console.log('🔄 Restarting GMGN Monitor...');
-      startGmgnMonitoringService();
-    }, 5000);
-  });
-
-  console.log('✅ GMGN Monitoring service started');
-}
   try {
-    console.log('🎯 Initializing AI Gem Hunter Service...');
+    console.log(`
+╔══════════════════════════════════════════════════════════════╗
+║                   🎯 ${SERVICE_NAME.padEnd(20)} 🎯                   ║
+╠══════════════════════════════════════════════════════════════╣
+║  Mode: ${USE_VELOCITY_HUNTER ? 'VELOCITY (Munger/Musk)' : 'LEGACY (Score-based)'}
+╚══════════════════════════════════════════════════════════════╝
+`);
     
     // Start health check server
     const healthServer = createHealthServer();
     console.log('✅ Health check server started');
 
-    // Start gem hunter service
-    startGemHunterService();
-      startPerfTrackerService();
+    // Start main service
+    startMainService();
     
-    console.log('💎 AI Gem Hunter is now running!');
+    // Start perf tracker if using legacy mode
+    if (!USE_VELOCITY_HUNTER) {
+      startPerfTrackerService();
+    }
+    
+    console.log(`💎 ${SERVICE_NAME} is now running!`);
 
-    // DISABLED: GMGN WebSocket gets 403 blocked
-    // startGmgnMonitoringService();
-
-    // Handle graceful shutdown
-    process.on('SIGTERM', () => {
-      console.log('📴 Received SIGTERM, shutting down gracefully...');
-      if (serviceProcess) {
-        // serviceProcess.kill();
-            if (perfTrackerProcess) {
-      perfTrackerProcess.kill();
-    }
-      }
-      healthServer.close(() => {
-        console.log('👋 Service stopped');
-        
-    if (gmgnMonitoringProcess) {
-      gmgnMonitoringProcess.kill();
-    }
-        process.exit(0);
-      });
-    });
-
-    process.on('SIGINT', () => {
-      console.log('📴 Received SIGINT, shutting down gracefully...');
-      if (serviceProcess) {
-        serviceProcess.kill();
-            if (perfTrackerProcess) {
-      perfTrackerProcess.kill();
-    }
-        
-    if (gmgnMonitoringProcess) {
-      gmgnMonitoringProcess.kill();
-    }
-      }
+    // Graceful shutdown handlers
+    const shutdown = (signal) => {
+      console.log(`📴 Received ${signal}, shutting down gracefully...`);
+      if (serviceProcess) serviceProcess.kill();
+      if (perfTrackerProcess) perfTrackerProcess.kill();
       healthServer.close(() => {
         console.log('👋 Service stopped');
         process.exit(0);
       });
-    });
+    };
+
+    process.on('SIGTERM', () => shutdown('SIGTERM'));
+    process.on('SIGINT', () => shutdown('SIGINT'));
 
   } catch (error) {
     console.error('❌ Fatal error starting service:', error);
@@ -223,5 +171,4 @@ function startGmgnMonitoringService() {
   }
 }
 
-// Start the service
 main();

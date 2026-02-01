@@ -1,0 +1,323 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Gem Hunter Performance Tracker</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    .win { color: #10b981; }
+    .loss { color: #ef4444; }
+    .neutral { color: #6b7280; }
+  </style>
+</head>
+<body class="bg-gray-900 text-white min-h-screen">
+  <div class="container mx-auto px-4 py-8">
+    <header class="mb-8">
+      <h1 class="text-3xl font-bold mb-2">💎 Gem Hunter Performance</h1>
+      <p class="text-gray-400">Track token performance to tune the algorithm</p>
+      <div id="lastUpdated" class="text-sm text-gray-500 mt-2"></div>
+    </header>
+
+    <!-- Summary Cards -->
+    <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
+      <div class="bg-gray-800 rounded-lg p-4">
+        <div class="text-gray-400 text-sm">Tokens Tracked (24h)</div>
+        <div id="tokensTracked" class="text-2xl font-bold">-</div>
+      </div>
+      <div class="bg-gray-800 rounded-lg p-4">
+        <div class="text-gray-400 text-sm">Win Rate</div>
+        <div id="winRate" class="text-2xl font-bold">-</div>
+      </div>
+      <div class="bg-gray-800 rounded-lg p-4">
+        <div class="text-gray-400 text-sm">Avg Return</div>
+        <div id="avgReturn" class="text-2xl font-bold">-</div>
+      </div>
+      <div class="bg-gray-800 rounded-lg p-4">
+        <div class="text-gray-400 text-sm">Best Performer</div>
+        <div id="bestPerformer" class="text-2xl font-bold">-</div>
+      </div>
+    </div>
+
+    <!-- Charts -->
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-8 mb-8">
+      <div class="bg-gray-800 rounded-lg p-4">
+        <h3 class="text-lg font-semibold mb-4">Score vs Performance</h3>
+        <canvas id="scoreChart"></canvas>
+      </div>
+      <div class="bg-gray-800 rounded-lg p-4">
+        <h3 class="text-lg font-semibold mb-4">Performance Distribution</h3>
+        <canvas id="distributionChart"></canvas>
+      </div>
+    </div>
+
+    <!-- Recent Tokens Table -->
+    <div class="bg-gray-800 rounded-lg p-4">
+      <h3 class="text-lg font-semibold mb-4">Recent Discoveries</h3>
+      <div class="overflow-x-auto">
+        <table class="w-full text-sm">
+          <thead class="text-gray-400 border-b border-gray-700">
+            <tr>
+              <th class="text-left py-2">Token</th>
+              <th class="text-left py-2">Score</th>
+              <th class="text-left py-2">Initial Liq</th>
+              <th class="text-left py-2">Current Price</th>
+              <th class="text-left py-2">Change</th>
+              <th class="text-left py-2">Status</th>
+              <th class="text-left py-2">Age</th>
+            </tr>
+          </thead>
+          <tbody id="tokenTable" class="divide-y divide-gray-700">
+            <tr><td colspan="7" class="py-4 text-center text-gray-500">Loading...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Score Analysis -->
+    <div class="bg-gray-800 rounded-lg p-4 mt-8">
+      <h3 class="text-lg font-semibold mb-4">📊 Score Component Analysis</h3>
+      <p class="text-gray-400 mb-4">Which score components best predict success?</p>
+      <div id="scoreAnalysis" class="grid grid-cols-2 md:grid-cols-5 gap-4">
+        <div class="text-center p-3 bg-gray-700 rounded">
+          <div class="text-gray-400 text-sm">Liquidity</div>
+          <div id="liqCorrelation" class="text-xl font-bold">-</div>
+        </div>
+        <div class="text-center p-3 bg-gray-700 rounded">
+          <div class="text-gray-400 text-sm">Volume</div>
+          <div id="volCorrelation" class="text-xl font-bold">-</div>
+        </div>
+        <div class="text-center p-3 bg-gray-700 rounded">
+          <div class="text-gray-400 text-sm">Holders</div>
+          <div id="holdCorrelation" class="text-xl font-bold">-</div>
+        </div>
+        <div class="text-center p-3 bg-gray-700 rounded">
+          <div class="text-gray-400 text-sm">Social</div>
+          <div id="socialCorrelation" class="text-xl font-bold">-</div>
+        </div>
+        <div class="text-center p-3 bg-gray-700 rounded">
+          <div class="text-gray-400 text-sm">Safety</div>
+          <div id="safetyCorrelation" class="text-xl font-bold">-</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const SUPABASE_URL = 'https://gparveoskfeajxkdmqrf.supabase.co';
+    const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdwYXJ2ZW9za2ZlYWp4a2RtcXJmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjIxMTM1MDcsImV4cCI6MjA3NzY4OTUwN30.M-V-CxLGl0J2I-rYBaQ9PPlk7lM0fKrwqPEq9OmqS7k';
+    
+    let scoreChart, distributionChart;
+    
+    async function fetchData() {
+      const headers = {
+        'apikey': SUPABASE_KEY,
+        'Authorization': `Bearer ${SUPABASE_KEY}`
+      };
+      
+      // Fetch discoveries
+      const discoveryRes = await fetch(
+        `${SUPABASE_URL}/rest/v1/gem_discoveries?select=*&order=discovered_at.desc&limit=100&name=neq.Unknown`,
+        { headers }
+      );
+      const discoveries = await discoveryRes.json();
+      
+      // Fetch performance updates
+      const perfRes = await fetch(
+        `${SUPABASE_URL}/rest/v1/gem_performance_updates?select=*&order=updated_at.desc&limit=200`,
+        { headers }
+      );
+      const performance = await perfRes.json();
+      
+      return { discoveries, performance };
+    }
+    
+    function calculateStats(discoveries, performance) {
+      // Group performance by token
+      const perfByToken = {};
+      performance.forEach(p => {
+        if (!perfByToken[p.token_address]) {
+          perfByToken[p.token_address] = [];
+        }
+        perfByToken[p.token_address].push(p);
+      });
+      
+      // Calculate metrics
+      const withPerf = discoveries.filter(d => perfByToken[d.token_address]?.length > 0);
+      const wins = withPerf.filter(d => {
+        const perf = perfByToken[d.token_address];
+        const latestChange = perf[0]?.price_change_percent || 0;
+        return latestChange > 0;
+      });
+      
+      const changes = withPerf.map(d => {
+        const perf = perfByToken[d.token_address];
+        return perf[0]?.price_change_percent || 0;
+      }).filter(c => c !== null);
+      
+      const avgChange = changes.length > 0 
+        ? changes.reduce((a, b) => a + b, 0) / changes.length 
+        : 0;
+      
+      const best = withPerf.reduce((best, d) => {
+        const perf = perfByToken[d.token_address];
+        const change = perf[0]?.price_change_percent || 0;
+        return change > (best?.change || -Infinity) ? { token: d, change } : best;
+      }, null);
+      
+      return {
+        total: discoveries.length,
+        tracked: withPerf.length,
+        wins: wins.length,
+        winRate: withPerf.length > 0 ? (wins.length / withPerf.length * 100).toFixed(1) : 0,
+        avgChange: avgChange.toFixed(1),
+        best,
+        perfByToken
+      };
+    }
+    
+    function updateUI(discoveries, stats) {
+      // Update summary cards
+      document.getElementById('tokensTracked').textContent = stats.total;
+      document.getElementById('winRate').textContent = stats.tracked > 0 ? `${stats.winRate}%` : 'N/A';
+      document.getElementById('avgReturn').textContent = stats.tracked > 0 ? `${stats.avgChange}%` : 'N/A';
+      document.getElementById('avgReturn').className = `text-2xl font-bold ${stats.avgChange >= 0 ? 'win' : 'loss'}`;
+      
+      if (stats.best) {
+        document.getElementById('bestPerformer').textContent = `+${stats.best.change.toFixed(0)}%`;
+        document.getElementById('bestPerformer').className = 'text-2xl font-bold win';
+      }
+      
+      document.getElementById('lastUpdated').textContent = `Last updated: ${new Date().toLocaleString()}`;
+      
+      // Update table
+      const tbody = document.getElementById('tokenTable');
+      tbody.innerHTML = discoveries.slice(0, 20).map(d => {
+        const perf = stats.perfByToken[d.token_address]?.[0];
+        const change = perf?.price_change_percent;
+        const changeClass = change > 0 ? 'win' : change < 0 ? 'loss' : 'neutral';
+        const status = perf?.status || 'tracking';
+        const age = getAge(d.discovered_at);
+        
+        return `
+          <tr>
+            <td class="py-2">
+              <div class="font-mono text-xs">${d.token_address.slice(0, 8)}...</div>
+              <div class="text-gray-400">${d.symbol || 'N/A'}</div>
+            </td>
+            <td class="py-2">${d.discovery_score}/100</td>
+            <td class="py-2">$${(d.initial_liquidity || 0).toLocaleString()}</td>
+            <td class="py-2">${perf?.current_price ? '$' + perf.current_price.toFixed(8) : '-'}</td>
+            <td class="py-2 ${changeClass}">${change !== null && change !== undefined ? (change >= 0 ? '+' : '') + change.toFixed(1) + '%' : '-'}</td>
+            <td class="py-2">
+              <span class="px-2 py-1 rounded text-xs ${getStatusClass(status)}">${status}</span>
+            </td>
+            <td class="py-2 text-gray-400">${age}</td>
+          </tr>
+        `;
+      }).join('');
+    }
+    
+    function getAge(timestamp) {
+      const diff = Date.now() - new Date(timestamp).getTime();
+      const hours = Math.floor(diff / (1000 * 60 * 60));
+      if (hours < 1) return `${Math.floor(diff / (1000 * 60))}m`;
+      if (hours < 24) return `${hours}h`;
+      return `${Math.floor(hours / 24)}d`;
+    }
+    
+    function getStatusClass(status) {
+      switch (status) {
+        case 'mooning': return 'bg-green-600';
+        case 'active': return 'bg-blue-600';
+        case 'rugged': return 'bg-red-600';
+        case 'dead': return 'bg-gray-600';
+        default: return 'bg-gray-600';
+      }
+    }
+    
+    function updateCharts(discoveries, stats) {
+      // Score vs Performance scatter
+      const scatterData = discoveries
+        .filter(d => stats.perfByToken[d.token_address]?.[0]?.price_change_percent !== null)
+        .map(d => ({
+          x: d.discovery_score,
+          y: stats.perfByToken[d.token_address][0].price_change_percent
+        }));
+      
+      if (scoreChart) scoreChart.destroy();
+      scoreChart = new Chart(document.getElementById('scoreChart'), {
+        type: 'scatter',
+        data: {
+          datasets: [{
+            label: 'Tokens',
+            data: scatterData,
+            backgroundColor: scatterData.map(d => d.y >= 0 ? 'rgba(16, 185, 129, 0.6)' : 'rgba(239, 68, 68, 0.6)'),
+          }]
+        },
+        options: {
+          responsive: true,
+          plugins: { legend: { display: false } },
+          scales: {
+            x: { title: { display: true, text: 'Discovery Score' }, grid: { color: '#374151' } },
+            y: { title: { display: true, text: 'Price Change %' }, grid: { color: '#374151' } }
+          }
+        }
+      });
+      
+      // Performance distribution
+      const changes = discoveries
+        .map(d => stats.perfByToken[d.token_address]?.[0]?.price_change_percent)
+        .filter(c => c !== null && c !== undefined);
+      
+      const buckets = { 'Dead (<-90%)': 0, 'Rugged (-90 to -50%)': 0, 'Down (-50 to 0%)': 0, 'Small gain (0-50%)': 0, 'Good (50-100%)': 0, 'Moon (>100%)': 0 };
+      changes.forEach(c => {
+        if (c < -90) buckets['Dead (<-90%)']++;
+        else if (c < -50) buckets['Rugged (-90 to -50%)']++;
+        else if (c < 0) buckets['Down (-50 to 0%)']++;
+        else if (c < 50) buckets['Small gain (0-50%)']++;
+        else if (c < 100) buckets['Good (50-100%)']++;
+        else buckets['Moon (>100%)']++;
+      });
+      
+      if (distributionChart) distributionChart.destroy();
+      distributionChart = new Chart(document.getElementById('distributionChart'), {
+        type: 'bar',
+        data: {
+          labels: Object.keys(buckets),
+          datasets: [{
+            data: Object.values(buckets),
+            backgroundColor: ['#dc2626', '#f87171', '#fbbf24', '#34d399', '#10b981', '#059669'],
+          }]
+        },
+        options: {
+          responsive: true,
+          plugins: { legend: { display: false } },
+          scales: {
+            y: { grid: { color: '#374151' } },
+            x: { grid: { color: '#374151' } }
+          }
+        }
+      });
+    }
+    
+    async function refresh() {
+      try {
+        const { discoveries, performance } = await fetchData();
+        const stats = calculateStats(discoveries, performance);
+        updateUI(discoveries, stats);
+        updateCharts(discoveries, stats);
+      } catch (err) {
+        console.error('Error fetching data:', err);
+      }
+    }
+    
+    // Initial load
+    refresh();
+    
+    // Auto-refresh every 5 minutes
+    setInterval(refresh, 5 * 60 * 1000);
+  </script>
+</body>
+</html>
