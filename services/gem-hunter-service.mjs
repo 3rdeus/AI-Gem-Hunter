@@ -319,6 +319,11 @@ async function executeAutomaticTrade(gemData) {
  */
 async function sendGemAlertWithScore(gemData) {
   const alertTier = getAlertTier(gemData.gemScore);
+  // Safely access basicData with fallbacks
+  const name = gemData.basicData?.name || 'Unknown';
+  const symbol = gemData.basicData?.symbol || 'N/A';
+  const source = gemData.source || 'unknown';
+  
   const message = `
 ${alertTier.emoji} *${alertTier.label}* ${alertTier.emoji}
 
@@ -326,29 +331,29 @@ ${alertTier.emoji} *${alertTier.label}* ${alertTier.emoji}
 ${gemData.interpretation}
 
 *Token Info:*
-• Name: ${gemData.basicData.name}
-• Symbol: ${gemData.basicData.symbol}
+• Name: ${name}
+• Symbol: ${symbol}
 • Address: \`${gemData.tokenAddress}\`
-• Source: ${gemData.source.toUpperCase()}
+• Source: ${source.toUpperCase()}
 
 *Score Breakdown:*
-• Liquidity: ${gemData.scoreBreakdown.liquidity}/100
-• Volume: ${gemData.scoreBreakdown.volume}/100
-• Holders: ${gemData.scoreBreakdown.holders}/100
-• Social: ${gemData.scoreBreakdown.social}/100
-• Safety: ${gemData.scoreBreakdown.safety}/100
+• Liquidity: ${gemData.scoreBreakdown?.liquidity || 0}/100
+• Volume: ${gemData.scoreBreakdown?.volume || 0}/100
+• Holders: ${gemData.scoreBreakdown?.holders || 0}/100
+• Social: ${gemData.scoreBreakdown?.social || 0}/100
+• Safety: ${gemData.scoreBreakdown?.safety || 0}/100
 
 *Metrics:*
-• Liquidity: $${gemData.metrics.liquidity.toLocaleString()}
-• 24h Volume: $${gemData.metrics.volume24h.toLocaleString()}
-• Holders: ${gemData.metrics.holders}
-• Market Cap: $${gemData.metrics.marketCap.toLocaleString()}
-• 24h Change: ${gemData.metrics.priceChange24h.toFixed(2)}%
+• Liquidity: $${(gemData.metrics?.liquidity || 0).toLocaleString()}
+• 24h Volume: $${(gemData.metrics?.volume24h || 0).toLocaleString()}
+• Holders: ${gemData.metrics?.holders || 0}
+• Market Cap: $${(gemData.metrics?.marketCap || 0).toLocaleString()}
+• 24h Change: ${(gemData.metrics?.priceChange24h || 0).toFixed(2)}%
 
 *Social Links:*
-${gemData.social.website ? `• Website: ${gemData.social.website}` : ''}
-${gemData.social.twitter ? `• Twitter: ${gemData.social.twitter}` : ''}
-${gemData.social.telegram ? `• Telegram: ${gemData.social.telegram}` : ''}
+${gemData.social?.website ? `• Website: ${gemData.social.website}` : ''}
+${gemData.social?.twitter ? `• Twitter: ${gemData.social.twitter}` : ''}
+${gemData.social?.telegram ? `• Telegram: ${gemData.social.telegram}` : ''}
 
 *View on:*
 • [Birdeye](https://birdeye.so/token/${gemData.tokenAddress})
